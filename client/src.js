@@ -6,7 +6,7 @@ import assign from 'lodash/object/assign';
 import cond from 'conditionals';
 
 const modelPropName = '__model__';
-export const storePropName = '__store__';
+const storePropName = '__store__';
 
 var __DEV__ = process.env.NODE_ENV !== 'production';
 
