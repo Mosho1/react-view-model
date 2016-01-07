@@ -16,6 +16,8 @@ const isString = isOfType('string');
 const isFunction = isOfType('function');
 const isUndefined = isOfType('undefined');
 
+/* ----- UTILS ----- */
+
 const traverse = (obj, cb, context = '') => {
 	// proprietary, no hasOwnProperty check
 	for (let key in obj) {
@@ -46,14 +48,14 @@ const getModelProps = (store, model) =>
 	mapObject(model, (val, path) =>
 		isString(val) || isFunction(val)
 			? get(store, path)
-			: undefined);
+			: null);
 
 
 const getComponentName = Component => Component.displayName || Component.name;
 
-
-
 const identity = x => x;
+
+/* ----- VALIDATION ----- */
 
 const getPropTypeValidator = (validatorName, required) => {
 	let validator = React.PropTypes[validatorName];
@@ -93,18 +95,21 @@ const getObjectValidator = (validators, errorFormatter, schemaName) => obj => {
 	for (let key in obj) {
 		error = validators[key](obj, key, schemaName);
 		if (error) {
-			return console.error(errorFormatter(error));
+			return error;
 		}
 	}
 };
 
 const getPropTypeValidatorsFromObject = obj => mapObject(obj, schemaMapper);
 
+/* ----- SCHEMA ----- */
+
 const getSchemaValidator = (schemaName, schemaObj) => {
 	const formatError = getErrorFormatter();
 	const validators = getPropTypeValidatorsFromObject(schemaObj);
 	return getObjectValidator(validators, formatError, schemaName);
 };
+
 
 export const schema = (schemaName, schemaObj) => {
 
@@ -133,6 +138,8 @@ export class Schema {
 	}
 }
 
+/* ----- STORE ----- */
+
 export const store = storeFn => Component => {
 	const newComponent = class extends React.Component {
 		getChildContext(props) {
@@ -151,6 +158,8 @@ export const store = storeFn => Component => {
 
 	return newComponent;
 };
+
+/* ----- MODEL ----- */
 
 export const model = modelObj => Component => {
 	const newComponent = class extends React.Component {
@@ -173,3 +182,40 @@ export const model = modelObj => Component => {
 
 	return newComponent;
 };
+
+/* ----- API ----- */
+
+import 'isomorphic-fetch';
+
+const enc = encodeURIComponent;
+
+const encodeQueryData = data =>
+	Object.keys(data).map(k =>
+		`${enc(k)}=${enc(data[k])}`).join('&');
+
+class ApiEndpoint {
+	constructor(name, url, schema, defaultOpts) {
+		this.schema = new Schema(name, schema);
+		this.url = url;
+		this.opts = defaultOpts;
+	}
+
+	validate = obj => {
+		const error = this.schema.validate(obj);
+		if (error) {
+			throw error;
+		} else {
+			return obj;
+		}
+	}
+
+	fetch(params, options) {
+
+		options = options ? {...this.opts, options} : this.opts;
+
+		return fetch(`${this.url}?${encodeQueryData(params)}`, options)
+			.then(response => response.json())
+			.then(this.validate);
+	}
+}
+
